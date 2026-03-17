@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "icon-generation"
+version = "0.1.0"
+description = "PyQt6 tool for converting images to multi-size ICO files"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "PyQt6>=6.7",
+  "Pillow>=10.4",
+]
+
+[project.optional-dependencies]
+build = [
+  "pyinstaller>=6.16",
+]
+
+[project.scripts]
+icon-tool = "icon_tool.app:main"
+
+[tool.uv]
+package = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/icon_tool"]
