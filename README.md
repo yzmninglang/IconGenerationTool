@@ -1,5 +1,6 @@
 <div align="center">
-# Icon Generation Tool
+
+<h3 align="center">Icon Generation Tool</h3>
 
 <p align="center">
   <img src="doc/icon.svg" alt="Icon Generation Tool" width="15%" />
