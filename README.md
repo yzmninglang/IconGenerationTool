@@ -1,9 +1,11 @@
 <div align="center">
 # Icon Generation Tool
-</div>
+
 <p align="center">
   <img src="doc/icon.svg" alt="Icon Generation Tool" width="15%" />
 </p>
+
+</div>
 
 <p align="center">
   <a href="./README.md">简体中文</a> ·
