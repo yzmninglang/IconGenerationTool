@@ -1,5 +1,19 @@
 # Icon Generation Tool
 
+<p align="center">
+  <img src="doc/icon.svg" alt="Icon Generation Tool" width="15%" />
+</p>
+
+<p align="center">
+  <a href="./README.md">简体中文</a> ·
+  <a href="./README.en.md">English</a>
+</p>
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white" alt="python" />
+  <img src="https://img.shields.io/badge/UI-PyQt6%20%2B%20Fluent-4B8BBE" alt="ui" />
+</p>
+
+
 A local `uv + PyQt6` GUI tool to convert common image formats into multi-size `.ico` files (up to `256x256`).
 
 ## Features
