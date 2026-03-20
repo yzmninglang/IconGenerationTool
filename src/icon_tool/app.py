@@ -3,11 +3,12 @@ from __future__ import annotations
 import base64
 import io
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Iterable
 
 from PIL import Image, ImageOps
-from PyQt6.QtCore import QByteArray, QMimeData, Qt
+from PyQt6.QtCore import QByteArray, QMimeData, Qt, QUrl
 from PyQt6.QtGui import QAction, QColor, QGuiApplication, QIcon, QImage, QKeySequence, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
@@ -69,11 +70,25 @@ def pil_to_pixmap(image: Image.Image) -> QPixmap:
 
 
 def copy_png_to_clipboard(image: Image.Image) -> None:
-    buffer = io.BytesIO()
-    image.convert("RGBA").save(buffer, format="PNG")
+    temp_dir = Path(__file__).resolve().parent
+    for old_file in temp_dir.glob("tmp_transparent_*.png"):
+        try:
+            old_file.unlink()
+        except OSError:
+            # Best-effort cleanup; continue if old temp file is in use.
+            pass
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    temp_path = temp_dir / f"tmp_transparent_{timestamp}.png"
+    image.convert("RGBA").save(temp_path, format="PNG")
+
+    file_url = QUrl.fromLocalFile(str(temp_path))
+    uri_payload = QByteArray((file_url.toString() + "\r\n").encode("utf-8"))
 
     mime_data = QMimeData()
-    mime_data.setData("image/png", QByteArray(buffer.getvalue()))
+    mime_data.setUrls([file_url])
+    mime_data.setData("text/uri-list", uri_payload)
+    mime_data.setText(str(temp_path))
     mime_data.setImageData(pil_to_qimage(image))
     QGuiApplication.clipboard().setMimeData(mime_data)
 
@@ -200,6 +215,7 @@ class MainWindow(QMainWindow):
         self.remove_mode = "white"
         self.threshold = 60
         self.cutout_mode_enabled = False
+        self.invert_mode_enabled = False
         self.fill_mode_enabled = False
         self.fill_color = (255, 255, 255)
 
