@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import io
 import sys
 from pathlib import Path
@@ -7,10 +8,11 @@ from typing import Iterable
 
 from PIL import Image, ImageOps
 from PyQt6.QtCore import QByteArray, QMimeData, Qt
-from PyQt6.QtGui import QAction, QGuiApplication, QIcon, QImage, QKeySequence, QPixmap
+from PyQt6.QtGui import QAction, QColor, QGuiApplication, QIcon, QImage, QKeySequence, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
     QButtonGroup,
+    QColorDialog,
     QFileDialog,
     QHBoxLayout,
     QLabel,
@@ -76,7 +78,34 @@ def copy_png_to_clipboard(image: Image.Image) -> None:
     QGuiApplication.clipboard().setMimeData(mime_data)
 
 
-def remove_background(source: Image.Image, mode: str, threshold: int) -> Image.Image:
+def rgb_to_hex(color: tuple[int, int, int]) -> str:
+    r, g, b = color
+    return f"#{r:02X}{g:02X}{b:02X}"
+
+
+def save_svg_with_embedded_png(source: Image.Image, destination: Path) -> None:
+    rgba = source.convert("RGBA")
+    width, height = rgba.size
+
+    png_buffer = io.BytesIO()
+    rgba.save(png_buffer, format="PNG")
+    encoded = base64.b64encode(png_buffer.getvalue()).decode("ascii")
+
+    svg = (
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        f"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\" viewBox=\"0 0 {width} {height}\">\n"
+        f"  <image width=\"{width}\" height=\"{height}\" href=\"data:image/png;base64,{encoded}\" />\n"
+        "</svg>\n"
+    )
+    destination.write_text(svg, encoding="utf-8")
+
+
+def remove_background(
+    source: Image.Image,
+    mode: str,
+    threshold: int,
+    fill_color: tuple[int, int, int] | None = None,
+) -> Image.Image:
     image = ImageOps.exif_transpose(source).convert("RGBA")
     threshold = max(0, min(255, threshold))
 
@@ -94,7 +123,10 @@ def remove_background(source: Image.Image, mode: str, threshold: int) -> Image.I
         else:
             is_background = min(r, g, b) >= white_limit
 
-        output.append((r, g, b, 0 if is_background else a))
+        if is_background and fill_color is not None:
+            output.append((fill_color[0], fill_color[1], fill_color[2], 255))
+        else:
+            output.append((r, g, b, 0 if is_background else a))
 
     result = Image.new("RGBA", image.size)
     result.putdata(output)
@@ -160,6 +192,8 @@ class MainWindow(QMainWindow):
         self.remove_mode = "white"
         self.threshold = 60
         self.cutout_mode_enabled = False
+        self.fill_mode_enabled = False
+        self.fill_color = (255, 255, 255)
 
         self.preview_label = QLabel("Import an image or paste it with Ctrl+V")
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -207,6 +241,15 @@ class MainWindow(QMainWindow):
         self.threshold_progress.setValue(self.threshold)
         self.threshold_progress.setFormat("Threshold: %v / 255")
 
+        self.fill_mode_button = QPushButton("Fill Mode: OFF")
+        self.fill_mode_button.setCheckable(True)
+        self.fill_mode_button.toggled.connect(self._toggle_fill_mode)
+
+        self.fill_color_button = QPushButton("")
+        self.fill_color_button.clicked.connect(self._choose_fill_color)
+        self.fill_color_button.setEnabled(False)
+        self._update_fill_color_button_appearance()
+
         action_layout = QHBoxLayout()
         action_layout.addWidget(self.import_button)
         action_layout.addWidget(self.paste_button)
@@ -225,10 +268,17 @@ class MainWindow(QMainWindow):
         threshold_layout.addWidget(self.threshold_slider, stretch=1)
         threshold_layout.addWidget(self.threshold_progress)
 
+        fill_layout = QHBoxLayout()
+        fill_layout.addWidget(QLabel("Background Fill:"))
+        fill_layout.addWidget(self.fill_mode_button)
+        fill_layout.addWidget(self.fill_color_button)
+        fill_layout.addStretch(1)
+
         root_layout = QVBoxLayout()
         root_layout.addLayout(action_layout)
         root_layout.addLayout(mode_layout)
         root_layout.addLayout(threshold_layout)
+        root_layout.addLayout(fill_layout)
         root_layout.addWidget(self.preview_label, stretch=1)
         root_layout.addWidget(self.info_label)
 
@@ -237,6 +287,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(root)
 
         self._create_shortcuts()
+        self._update_export_button_text()
 
     def _create_shortcuts(self) -> None:
         paste_action = QAction("Paste", self)
@@ -258,7 +309,32 @@ class MainWindow(QMainWindow):
     def _toggle_cutout_mode(self, enabled: bool) -> None:
         self.cutout_mode_enabled = enabled
         self.cutout_mode_button.setText("Cutout Mode: ON" if enabled else "Cutout Mode: OFF")
+        self._update_export_button_text()
         self._reprocess_image()
+
+    def _toggle_fill_mode(self, enabled: bool) -> None:
+        self.fill_mode_enabled = enabled
+        self.fill_mode_button.setText("Fill Mode: ON" if enabled else "Fill Mode: OFF")
+        self.fill_color_button.setEnabled(enabled)
+        self._reprocess_image()
+
+    def _choose_fill_color(self) -> None:
+        current = QColor(*self.fill_color)
+        color = QColorDialog.getColor(current, self, "Select Fill Color")
+        if not color.isValid():
+            return
+        self.fill_color = (color.red(), color.green(), color.blue())
+        self._update_fill_color_button_appearance()
+        self._reprocess_image()
+
+    def _update_fill_color_button_appearance(self) -> None:
+        color_hex = rgb_to_hex(self.fill_color)
+        text_color = "#000000" if sum(self.fill_color) > 382 else "#FFFFFF"
+        self.fill_color_button.setText(f"Fill Color ({color_hex})")
+        self.fill_color_button.setStyleSheet(f"background-color: {color_hex}; color: {text_color};")
+
+    def _update_export_button_text(self) -> None:
+        self.export_button.setText("Export PNG/SVG" if self.cutout_mode_enabled else "Export ICO")
 
     def import_image(self) -> None:
         file_path, _ = QFileDialog.getOpenFileName(self, "Select Image", "", SUPPORTED_IMAGE_FILTER)
@@ -295,7 +371,13 @@ class MainWindow(QMainWindow):
             self._refresh_preview()
             return
 
-        self.processed_image = remove_background(self.source_image, self.remove_mode, self.threshold)
+        fill_color = self.fill_color if self.fill_mode_enabled else None
+        self.processed_image = remove_background(
+            self.source_image,
+            self.remove_mode,
+            self.threshold,
+            fill_color=fill_color,
+        )
 
         if self.cutout_mode_enabled:
             copy_png_to_clipboard(self.processed_image)
@@ -315,15 +397,28 @@ class MainWindow(QMainWindow):
 
         mode_text = "White" if self.remove_mode == "white" else "Black"
         cutout_text = "ON (PNG copied to clipboard)" if self.cutout_mode_enabled else "OFF"
+        fill_text = f"ON ({rgb_to_hex(self.fill_color)})" if self.fill_mode_enabled else "OFF"
+        export_text = "PNG/SVG" if self.cutout_mode_enabled else f"ICO ({', '.join(str(s) for s in ICON_SIZES)})"
+
         self.info_label.setText(
             f"{self.current_source_desc} | Original: {self.source_image.width}x{self.source_image.height} | "
-            f"Remove: {mode_text} | Threshold: {self.threshold} | Cutout: {cutout_text} | "
-            f"ICO: {', '.join(str(s) for s in ICON_SIZES)}"
+            f"Remove: {mode_text} | Threshold: {self.threshold} | Fill: {fill_text} | "
+            f"Cutout: {cutout_text} | Export: {export_text}"
         )
 
     def export_icon(self) -> None:
         if self.processed_image is None:
             QMessageBox.information(self, "No Image", "Please import or paste an image first.")
+            return
+
+        if self.cutout_mode_enabled:
+            self._export_cutout_asset()
+            return
+
+        self._export_ico()
+
+    def _export_ico(self) -> None:
+        if self.processed_image is None:
             return
 
         file_path, _ = QFileDialog.getSaveFileName(self, "Save ICO", "icon.ico", "Icon Files (*.ico)")
@@ -338,6 +433,36 @@ class MainWindow(QMainWindow):
             save_multi_icon(self.processed_image, target, ICON_SIZES)
         except Exception as exc:
             QMessageBox.critical(self, "Export Failed", f"Could not export ICO:\n{exc}")
+            return
+
+        QMessageBox.information(self, "Export Complete", f"Saved to:\n{target}")
+
+    def _export_cutout_asset(self) -> None:
+        if self.processed_image is None:
+            return
+
+        file_path, selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Save Cutout",
+            "cutout.png",
+            "PNG Files (*.png);;SVG Files (*.svg)",
+        )
+        if not file_path:
+            return
+
+        target = Path(file_path)
+        selected_is_svg = selected_filter.startswith("SVG")
+        if target.suffix.lower() not in {".png", ".svg"}:
+            target = target.with_suffix(".svg" if selected_is_svg else ".png")
+
+        export_svg = target.suffix.lower() == ".svg"
+        try:
+            if export_svg:
+                save_svg_with_embedded_png(self.processed_image, target)
+            else:
+                self.processed_image.convert("RGBA").save(target, format="PNG")
+        except Exception as exc:
+            QMessageBox.critical(self, "Export Failed", f"Could not export cutout:\n{exc}")
             return
 
         QMessageBox.information(self, "Export Complete", f"Saved to:\n{target}")
