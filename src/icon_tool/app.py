@@ -100,6 +100,14 @@ def save_svg_with_embedded_png(source: Image.Image, destination: Path) -> None:
     destination.write_text(svg, encoding="utf-8")
 
 
+def invert_colors_preserving_alpha(source: Image.Image) -> Image.Image:
+    image = ImageOps.exif_transpose(source).convert("RGBA")
+    r, g, b, a = image.split()
+    inverted_rgb = ImageOps.invert(Image.merge("RGB", (r, g, b)))
+    inv_r, inv_g, inv_b = inverted_rgb.split()
+    return Image.merge("RGBA", (inv_r, inv_g, inv_b, a))
+
+
 def remove_background(
     source: Image.Image,
     mode: str,
@@ -217,6 +225,10 @@ class MainWindow(QMainWindow):
         self.cutout_mode_button.setCheckable(True)
         self.cutout_mode_button.toggled.connect(self._toggle_cutout_mode)
 
+        self.invert_mode_button = QPushButton("Invert: OFF")
+        self.invert_mode_button.setCheckable(True)
+        self.invert_mode_button.toggled.connect(self._toggle_invert_mode)
+
         self.remove_white_button = QPushButton("Remove White")
         self.remove_white_button.setCheckable(True)
         self.remove_white_button.setChecked(True)
@@ -261,6 +273,7 @@ class MainWindow(QMainWindow):
         mode_layout.addWidget(QLabel("Background Removal:"))
         mode_layout.addWidget(self.remove_white_button)
         mode_layout.addWidget(self.remove_black_button)
+        mode_layout.addWidget(self.invert_mode_button)
         mode_layout.addStretch(1)
 
         threshold_layout = QHBoxLayout()
@@ -310,6 +323,11 @@ class MainWindow(QMainWindow):
         self.cutout_mode_enabled = enabled
         self.cutout_mode_button.setText("Cutout Mode: ON" if enabled else "Cutout Mode: OFF")
         self._update_export_button_text()
+        self._reprocess_image()
+
+    def _toggle_invert_mode(self, enabled: bool) -> None:
+        self.invert_mode_enabled = enabled
+        self.invert_mode_button.setText("Invert: ON" if enabled else "Invert: OFF")
         self._reprocess_image()
 
     def _toggle_fill_mode(self, enabled: bool) -> None:
@@ -371,9 +389,13 @@ class MainWindow(QMainWindow):
             self._refresh_preview()
             return
 
+        processing_source = self.source_image
+        if self.invert_mode_enabled:
+            processing_source = invert_colors_preserving_alpha(processing_source)
+
         fill_color = self.fill_color if self.fill_mode_enabled else None
         self.processed_image = remove_background(
-            self.source_image,
+            processing_source,
             self.remove_mode,
             self.threshold,
             fill_color=fill_color,
@@ -396,13 +418,14 @@ class MainWindow(QMainWindow):
         self.preview_label.setPixmap(pil_to_pixmap(preview))
 
         mode_text = "White" if self.remove_mode == "white" else "Black"
+        invert_text = "ON" if self.invert_mode_enabled else "OFF"
         cutout_text = "ON (PNG copied to clipboard)" if self.cutout_mode_enabled else "OFF"
         fill_text = f"ON ({rgb_to_hex(self.fill_color)})" if self.fill_mode_enabled else "OFF"
         export_text = "PNG/SVG" if self.cutout_mode_enabled else f"ICO ({', '.join(str(s) for s in ICON_SIZES)})"
 
         self.info_label.setText(
             f"{self.current_source_desc} | Original: {self.source_image.width}x{self.source_image.height} | "
-            f"Remove: {mode_text} | Threshold: {self.threshold} | Fill: {fill_text} | "
+            f"Remove: {mode_text} | Invert: {invert_text} | Threshold: {self.threshold} | Fill: {fill_text} | "
             f"Cutout: {cutout_text} | Export: {export_text}"
         )
 
