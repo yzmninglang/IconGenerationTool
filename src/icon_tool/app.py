@@ -203,7 +203,7 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Icon Generator (up to 256x256)")
-        self.resize(900, 640)
+        self.resize(400, 583)
 
         icon_path = resolve_app_icon_path()
         if icon_path is not None:
@@ -220,6 +220,7 @@ class MainWindow(QMainWindow):
         self.cutout_mode_enabled = False
         self.invert_mode_enabled = False
         self.fill_mode_enabled = False
+        self.always_on_top_enabled = False
         self.fill_color = (255, 255, 255)
 
         self.preview_label = QLabel("Import an image or paste it with Ctrl+V")
@@ -317,6 +318,11 @@ class MainWindow(QMainWindow):
         root = QWidget()
         root.setLayout(root_layout)
         self.setCentralWidget(root)
+        
+        self.pin_top_button = QPushButton("Always On Top: OFF")
+        self.pin_top_button.setCheckable(True)
+        self.pin_top_button.toggled.connect(self._toggle_always_on_top)
+        self.statusBar().addPermanentWidget(self.pin_top_button)
 
         self._create_shortcuts()
         self._update_export_button_text()
@@ -354,6 +360,12 @@ class MainWindow(QMainWindow):
         self.fill_mode_button.setText("Fill Mode: ON" if enabled else "Fill Mode: OFF")
         self.fill_color_button.setEnabled(enabled)
         self._reprocess_image()
+
+    def _toggle_always_on_top(self, enabled: bool) -> None:
+        self.always_on_top_enabled = enabled
+        self.pin_top_button.setText("Always On Top: ON" if enabled else "Always On Top: OFF")
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, enabled)
+        self.show()
 
     def _choose_fill_color(self) -> None:
         current = QColor(*self.fill_color)
