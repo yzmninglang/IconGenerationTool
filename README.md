@@ -9,7 +9,7 @@
 </div>
 
 <p align="center">
-  <a href="./README.md">简体中文</a> ·
+  <a href="./README.md">Chinese</a> ·
   <a href="./README.en.md">English</a>
 </p>
 <p align="center">
@@ -17,8 +17,7 @@
   <img src="https://img.shields.io/badge/UI-PyQt6%20%2B%20Fluent-4B8BBE" alt="ui" />
 </p>
 
-
-A local `uv + PyQt6` GUI tool to convert common image formats into multi-size `.ico` files (up to `256x256`).
+A local `uv + PyQt6` GUI tool for image background cutout and export (`PNG`/`SVG`) plus multi-size `.ico` generation (up to `256x256`).
 
 ## Features
 
@@ -27,10 +26,13 @@ A local `uv + PyQt6` GUI tool to convert common image formats into multi-size `.
 - Background removal mode switch: `Remove White` / `Remove Black`
 - Threshold control `0-255` with a progress indicator
 - Cutout mode toggle:
-  - When ON, the app applies background transparency using current mode + threshold
-  - No extra scaling is applied to the source image in this mode
-  - The transparent result is automatically copied to clipboard as PNG
-- Export multi-size ICO: `16, 24, 32, 48, 64, 96, 128, 256`
+  - When ON, the app applies background removal with current mode + threshold
+  - In cutout mode, export supports `PNG` and `SVG`
+  - The processed result is automatically copied to clipboard as PNG
+- Background fill mode (default OFF):
+  - When ON, removed background pixels are filled with a selected RGB color (non-transparent)
+  - Default fill color is white (`#FFFFFF`), and can be changed manually
+- Export multi-size ICO in normal mode: `16, 24, 32, 48, 64, 96, 128, 256`
 - ICO rendering uses aspect-ratio-preserving scale and center placement (no center-cropping)
 - App icon support:
   - Root `icon.ico` is used for the packaged EXE icon
