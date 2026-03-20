@@ -25,10 +25,11 @@ A local `uv + PyQt6` GUI tool for image background cutout and export (`PNG`/`SVG
 - Paste image directly with `Ctrl+V`
 - Background removal mode switch: `Remove White` / `Remove Black`
 - Threshold control `0-255` with a progress indicator
+- Optional invert preprocess (`Invert: ON/OFF`): invert colors before background removal (useful for black background + white foreground cases)
 - Cutout mode toggle:
   - When ON, the app applies background removal with current mode + threshold
   - In cutout mode, export supports `PNG` and `SVG`
-  - The processed result is automatically copied to clipboard as PNG
+  - The processed result is exported to a temporary PNG and copied to clipboard as a file URL, so it can be pasted in File Explorer and other apps
 - Background fill mode (default OFF):
   - When ON, removed background pixels are filled with a selected RGB color (non-transparent)
   - Default fill color is white (`#FFFFFF`), and can be changed manually
@@ -37,6 +38,7 @@ A local `uv + PyQt6` GUI tool for image background cutout and export (`PNG`/`SVG
 - App icon support:
   - Root `icon.ico` is used for the packaged EXE icon
   - Runtime window icon is also set, including Windows title bar top-left icon
+- Clipboard temp files are written to system temp folder: `%TEMP%/IconGenerationTool/clipboard` (old `tmp_transparent_*.png` files are cleaned automatically)
 
 ## Run With uv
 

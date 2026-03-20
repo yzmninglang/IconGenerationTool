@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import io
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -70,7 +71,9 @@ def pil_to_pixmap(image: Image.Image) -> QPixmap:
 
 
 def copy_png_to_clipboard(image: Image.Image) -> None:
-    temp_dir = Path(__file__).resolve().parent
+    temp_root = Path(os.getenv("TEMP") or os.getenv("TMP") or str(Path.home() / "AppData" / "Local" / "Temp"))
+    temp_dir = temp_root / "IconGenerationTool" / "clipboard"
+    temp_dir.mkdir(parents=True, exist_ok=True)
     for old_file in temp_dir.glob("tmp_transparent_*.png"):
         try:
             old_file.unlink()
